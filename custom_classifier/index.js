@@ -1,9 +1,14 @@
+// Create a classifier object, specifically a KNN type
+const classifier = knnClassifier.create();
+
+
+// get the webcam object
 const webcamElement = document.getElementById('webcam');
 
 
 let net;
 
-// This version of app() would predict using an image. It has been replaced with a new app() that uses a webcam instead.
+// This version of app() would predict using an image. It has been replaced with a new app().
 async function app_run_image() {
   console.log('Loading mobilenet..');
 
@@ -17,7 +22,7 @@ async function app_run_image() {
   console.log(result);
 }
 
-async function app() {
+async function app_webcam() {
   console.log('Loading mobilenet..');
 
   // Load the model.
@@ -35,6 +40,51 @@ async function app() {
 
     // Give some breathing room by waiting for the next animation frame to
     // fire.
+    await tf.nextFrame();
+  }
+}
+
+
+// This newest version of app() uses a webcam like app_webcam(), but it now also allows for training new classes
+async function app() {
+  console.log('Loading mobilenet..');
+
+  // Load the model.
+  net = await mobilenet.load();
+  console.log('Sucessfully loaded model');
+
+  await setupWebcam();
+
+  // Reads an image from the webcam and associates it with a specific class
+  // index.
+  const addExample = classId => {
+    // Get the intermediate activation of MobileNet 'conv_preds' and pass that
+    // to the KNN classifier.
+    const activation = net.infer(webcamElement, 'conv_preds');
+
+    // Pass the intermediate activation to the classifier.
+    classifier.addExample(activation, classId);
+  };
+
+  // When clicking a button, add an example for that class.
+  document.getElementById('class-a').addEventListener('click', () => addExample(0));
+  document.getElementById('class-b').addEventListener('click', () => addExample(1));
+  document.getElementById('class-c').addEventListener('click', () => addExample(2));
+
+  while (true) {
+    if (classifier.getNumClasses() > 0) {
+      // Get the activation from mobilenet from the webcam.
+      const activation = net.infer(webcamElement, 'conv_preds');
+      // Get the most likely class and confidences from the classifier module.
+      const result = await classifier.predictClass(activation);
+
+      const classes = ['A', 'B', 'C'];
+      document.getElementById('console').innerText = `
+        prediction: ${classes[result.classIndex]}\n
+        probability: ${result.confidences[result.classIndex]}
+      `;
+    }
+
     await tf.nextFrame();
   }
 }
